@@ -4,7 +4,7 @@
  * Copyright 2006-2010		Johannes Berg <johannes@sipsolutions.net>
  */
 
-#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+//#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
 
 #include <linux/if.h>
 #include <linux/module.h>
@@ -230,6 +230,7 @@ int cfg80211_dev_rename(struct cfg80211_registered_device *rdev,
 	return 0;
 }
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,24))
 int cfg80211_switch_netns(struct cfg80211_registered_device *rdev,
 			  struct net *net)
 {
@@ -270,6 +271,7 @@ int cfg80211_switch_netns(struct cfg80211_registered_device *rdev,
 
 	return 0;
 }
+#endif
 
 static void cfg80211_rfkill_poll(struct rfkill *rfkill, void *data)
 {
@@ -330,6 +332,17 @@ struct wiphy *wiphy_new(const struct cfg80211_ops *ops, int sizeof_priv)
 	struct cfg80211_registered_device *rdev;
 	int alloc_size;
 
+	/*
+	 * Make sure the padding is >= the rest of the struct so that we
+	 * always keep it large enough to pad out the entire original
+	 * kernel's struct. We really only need to make sure it's larger
+	 * than the kernel compat is compiled against, but since it'll
+	 * only increase in size make sure it's larger than the current
+	 * version of it. Subtract since it's included.
+	 */
+	BUILD_BUG_ON(WIPHY_COMPAT_PAD_SIZE <
+		     sizeof(struct wiphy) - WIPHY_COMPAT_PAD_SIZE);
+
 	WARN_ON(ops->add_key && (!ops->del_key || !ops->set_default_key));
 	WARN_ON(ops->auth && (!ops->assoc || !ops->deauth || !ops->disassoc));
 	WARN_ON(ops->connect && !ops->disconnect);
@@ -372,10 +385,6 @@ struct wiphy *wiphy_new(const struct cfg80211_ops *ops, int sizeof_priv)
 	INIT_LIST_HEAD(&rdev->bss_list);
 	INIT_WORK(&rdev->scan_done_wk, __cfg80211_scan_done);
 	INIT_WORK(&rdev->sched_scan_results_wk, __cfg80211_sched_scan_results);
-#ifdef CONFIG_CFG80211_WEXT
-	rdev->wiphy.wext = &cfg80211_wext_handler;
-#endif
-
 	device_initialize(&rdev->wiphy.dev);
 	rdev->wiphy.dev.class = &ieee80211_class;
 	rdev->wiphy.dev.platform_data = rdev;
@@ -384,7 +393,9 @@ struct wiphy *wiphy_new(const struct cfg80211_ops *ops, int sizeof_priv)
 	rdev->wiphy.flags |= WIPHY_FLAG_PS_ON_BY_DEFAULT;
 #endif
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,24))
 	wiphy_net_set(&rdev->wiphy, &init_net);
+#endif
 
 	rdev->rfkill_ops.set_block = cfg80211_rfkill_set_block;
 	rdev->rfkill = rfkill_alloc(dev_name(&rdev->wiphy.dev),
@@ -488,6 +499,14 @@ int wiphy_register(struct wiphy *wiphy)
 	int i;
 	u16 ifmodes = wiphy->interface_modes;
 
+	if (WARN_ON((wiphy->wowlan.flags & WIPHY_WOWLAN_GTK_REKEY_FAILURE) &&
+		    !(wiphy->wowlan.flags & WIPHY_WOWLAN_SUPPORTS_GTK_REKEY)))
+		return -EINVAL;
+
+	if (WARN_ON(wiphy->ap_sme_capa &&
+		    !(wiphy->flags & WIPHY_FLAG_HAVE_AP_SME)))
+		return -EINVAL;
+
 	if (WARN_ON(wiphy->addresses && !wiphy->n_addresses))
 		return -EINVAL;
 
@@ -578,7 +597,7 @@ int wiphy_register(struct wiphy *wiphy)
 	}
 
 	/* set up regulatory info */
-	wiphy_update_regulatory(wiphy, NL80211_REGDOM_SET_BY_CORE);
+	regulatory_update(wiphy, NL80211_REGDOM_SET_BY_CORE);
 
 	list_add_rcu(&rdev->list, &cfg80211_rdev_list);
 	cfg80211_rdev_list_generation++;
@@ -612,6 +631,9 @@ int wiphy_register(struct wiphy *wiphy)
 	if (res)
 		goto out_rm_dev;
 
+	rtnl_lock();
+	rdev->wiphy.registered = true;
+	rtnl_unlock();
 	return 0;
 
 out_rm_dev:
@@ -642,6 +664,10 @@ EXPORT_SYMBOL(wiphy_rfkill_stop_polling);
 void wiphy_unregister(struct wiphy *wiphy)
 {
 	struct cfg80211_registered_device *rdev = wiphy_to_dev(wiphy);
+
+	rtnl_lock();
+	rdev->wiphy.registered = false;
+	rtnl_unlock();
 
 	rfkill_unregister(rdev->rfkill);
 
@@ -758,9 +784,11 @@ static void wdev_cleanup_work(struct work_struct *work)
 	dev_put(wdev->netdev);
 }
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,32))
 static struct device_type wiphy_type = {
 	.name	= "wlan",
 };
+#endif
 
 static int cfg80211_netdev_notifier_call(struct notifier_block * nb,
 					 unsigned long state,
@@ -798,8 +826,10 @@ static int cfg80211_netdev_notifier_call(struct notifier_block * nb,
 		mutex_lock(&rdev->devlist_mtx);
 		list_add_rcu(&wdev->list, &rdev->netdev_list);
 		rdev->devlist_generation++;
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,24))
 		/* can only change netns with wiphy */
 		dev->features |= NETIF_F_NETNS_LOCAL;
+#endif
 
 		if (sysfs_create_link(&dev->dev.kobj, &rdev->wiphy.dev.kobj,
 				      "phy80211")) {
@@ -809,6 +839,21 @@ static int cfg80211_netdev_notifier_call(struct notifier_block * nb,
 		wdev->sme_state = CFG80211_SME_IDLE;
 		mutex_unlock(&rdev->devlist_mtx);
 #ifdef CONFIG_CFG80211_WEXT
+#ifdef CONFIG_WIRELESS_EXT
+		if (!dev->wireless_handlers)
+			dev->wireless_handlers = &cfg80211_wext_handler;
+#else
+#ifdef CONFIG_MACH_PX
+		dev->ieee80211_ptr->wiphy->wext = &cfg80211_wext_handler;
+		printk_once(KERN_WARNING "cfg80211: wext will work even though "
+			"kernel was compiled with CONFIG_WIRELESS_EXT=n.\n");
+#else
+		printk_once(KERN_WARNING "cfg80211: wext will not work because "
+			    "kernel was compiled with CONFIG_WIRELESS_EXT=n. "
+			    "Tools using wext interface, like iwconfig will "
+			    "not work.\n");
+#endif
+#endif
 		wdev->wext.default_key = -1;
 		wdev->wext.default_mgmt_key = -1;
 		wdev->wext.connect.auth_type = NL80211_AUTHTYPE_AUTOMATIC;
@@ -918,7 +963,8 @@ static int cfg80211_netdev_notifier_call(struct notifier_block * nb,
 		 * Configure power management to the driver here so that its
 		 * correctly set also after interface type changes etc.
 		 */
-		if (wdev->iftype == NL80211_IFTYPE_STATION &&
+		if ((wdev->iftype == NL80211_IFTYPE_STATION ||
+		     wdev->iftype == NL80211_IFTYPE_P2P_CLIENT) &&
 		    rdev->ops->set_power_mgmt)
 			if (rdev->ops->set_power_mgmt(wdev->wiphy, dev,
 						      wdev->ps,
@@ -978,6 +1024,7 @@ static struct notifier_block cfg80211_netdev_notifier = {
 	.notifier_call = cfg80211_netdev_notifier_call,
 };
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,24))
 static void __net_exit cfg80211_pernet_exit(struct net *net)
 {
 	struct cfg80211_registered_device *rdev;
@@ -995,14 +1042,17 @@ static void __net_exit cfg80211_pernet_exit(struct net *net)
 static struct pernet_operations cfg80211_pernet_ops = {
 	.exit = cfg80211_pernet_exit,
 };
+#endif
 
 static int __init cfg80211_init(void)
 {
 	int err;
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,24))
 	err = register_pernet_device(&cfg80211_pernet_ops);
 	if (err)
 		goto out_fail_pernet;
+#endif
 
 	err = wiphy_sysfs_init();
 	if (err)
@@ -1037,8 +1087,10 @@ out_fail_nl80211:
 out_fail_notifier:
 	wiphy_sysfs_exit();
 out_fail_sysfs:
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,24))
 	unregister_pernet_device(&cfg80211_pernet_ops);
 out_fail_pernet:
+#endif
 	return err;
 }
 subsys_initcall(cfg80211_init);
@@ -1050,7 +1102,9 @@ static void __exit cfg80211_exit(void)
 	unregister_netdevice_notifier(&cfg80211_netdev_notifier);
 	wiphy_sysfs_exit();
 	regulatory_exit();
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,24))
 	unregister_pernet_device(&cfg80211_pernet_ops);
+#endif
 	destroy_workqueue(cfg80211_wq);
 }
 module_exit(cfg80211_exit);

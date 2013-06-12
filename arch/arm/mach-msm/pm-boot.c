@@ -106,8 +106,10 @@ int __init msm_pm_boot_init(int tz_available, uint32_t *address)
 		msm_pm_boot_after_pc
 			= msm_pm_config_rst_vector_after_pc;
 		break;
+	#ifdef CONFIG_BUG
 	default:
 		__WARN();
+	#endif
 	}
 
 	return ret;

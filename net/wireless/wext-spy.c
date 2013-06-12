@@ -10,6 +10,7 @@
 #include <linux/wireless.h>
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
+#include <linux/export.h>
 #include <net/iw_handler.h>
 #include <net/arp.h>
 #include <net/wext.h>
@@ -86,7 +87,7 @@ int iw_handler_get_spy(struct net_device *	dev,
 	wrqu->data.length = spydata->spy_number;
 
 	/* Copy addresses. */
-	for (i = 0; i < spydata->spy_number; i++) 	{
+	for (i = 0; i < spydata->spy_number; i++)	{
 		memcpy(address[i].sa_data, spydata->spy_address[i], ETH_ALEN);
 		address[i].sa_family = AF_UNIX;
 	}

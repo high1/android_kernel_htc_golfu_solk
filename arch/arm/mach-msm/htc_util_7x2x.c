@@ -20,8 +20,10 @@
 
 extern void htc_print_active_wake_locks(int type);
 extern void htc_show_interrupts(void);
+#ifdef CONFIG_TIMER_STATS
 extern void htc_timer_stats_OnOff(char onoff);
 extern void htc_timer_stats_show(u16 water_mark);
+#endif
 
 #ifndef arch_idle_time
 #define arch_idle_time(cpu) 0
@@ -146,9 +148,11 @@ void htc_PM_monitor_work(struct work_struct *work)
 	print_sleep_stat();
 	#endif
 	htc_idle_stat_clear();
+	#ifdef CONFIG_TIMER_STATS
 	htc_timer_stats_OnOff('0');
 	htc_timer_stats_show(300);
 	htc_timer_stats_OnOff('1');
+	#endif
 	htc_print_active_perf_locks();
 	htc_print_active_wake_locks(WAKE_LOCK_IDLE);
 	htc_print_active_wake_locks(WAKE_LOCK_SUSPEND);
