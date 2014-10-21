@@ -1435,8 +1435,10 @@ err_hif:
 static void ath6kl_sdio_remove(struct sdio_func *func)
 {
 	struct ath6kl_sdio *ar_sdio;
+#ifdef CONFIG_MACH_PX
 	struct ath6kl_vif *vif;
 	long timeleft;
+#endif
 
 	ath6kl_dbg(ATH6KL_DBG_BOOT,
 		   "sdio removed func %d vendor 0x%x device 0x%x\n",

@@ -1139,14 +1139,13 @@ static int32_t s5k4e1_power_down(void)
 	return 0;
 }
 
-#if 0
+
 static int s5k4e1_probe_init_done(const struct msm_camera_sensor_info *data)
 {
 	pr_info("probe done\n");
 	gpio_free(data->sensor_reset);
 	return 0;
 }
-#endif
 
 static int s5k4e1_probe_init_sensor(const struct msm_camera_sensor_info *data)
 {
@@ -1820,15 +1819,15 @@ static int s5k4e1_sensor_probe(const struct msm_camera_sensor_info *info,
 	s->s_init = s5k4e1_sensor_open_init;
 	s->s_release = s5k4e1_sensor_release;
 	s->s_config  = s5k4e1_sensor_config;
+#if 0
     msleep(2);
 	gpio_set_value(info->sensor_reset, 0);
 	msleep(1);//shuji 0119
+#endif
 /* HTC START */
-#if 0
 	s->s_mount_angle = info->sensor_platform_info->mount_angle;
 	gpio_set_value_cansleep(info->sensor_reset, 0);
 	s5k4e1_probe_init_done(info);
-#endif
 /* HTC_END */
 
 #if 0 /* Mark it due to this action is not done at probe stage */

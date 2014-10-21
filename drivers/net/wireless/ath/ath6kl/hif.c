@@ -25,6 +25,9 @@
 
 #define ATH6KL_TIME_QUANTUM	10  /* in ms */
 
+void cfg80211_priv_event(struct net_device *dev,
+                                 const char *priv_event, gfp_t gfp);
+
 static int ath6kl_hif_cp_scat_dma_buf(struct hif_scatter_req *req,
 				      bool from_dma)
 {

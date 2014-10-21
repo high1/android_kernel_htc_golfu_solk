@@ -164,6 +164,7 @@ static unsigned golfu_perf_acpu_table[] = {
        245760000,
        480000000,
        600000000,
+       828000000,
 };
 
 static struct perflock_platform_data golfu_perflock_data = {
@@ -1703,7 +1704,7 @@ static struct platform_device msm_camera_sensor_mt9t013 = {
 
 #ifdef CONFIG_S5K4E1
 static struct msm_camera_sensor_platform_info s5k4e1_sensor_7627a_info = {
-	.mount_angle = 90
+	.mount_angle = 0
 };
 
 static struct msm_camera_sensor_flash_data flash_s5k4e1 = {
@@ -1712,7 +1713,7 @@ static struct msm_camera_sensor_flash_data flash_s5k4e1 = {
 	.flash_src              = &msm_flash_src
 #endif
 };
-static struct msm_camera_sensor_info msm_camera_sensor_s5k4e1_data;
+//static struct msm_camera_sensor_info msm_camera_sensor_s5k4e1_data;
 static struct msm_camera_sensor_info msm_camera_sensor_s5k4e1_data = {
 	.sensor_name    = "s5k4e1",
 /*	.sensor_reset_enable = 1, */
@@ -1734,6 +1735,14 @@ static struct platform_device msm_camera_sensor_s5k4e1 = {
 	},
 };
 #endif
+
+static struct i2c_board_info i2c_camera_devices[] = {
+	#ifdef CONFIG_S5K4E1
+	{
+		I2C_BOARD_INFO("s5k4e1", 0x20 >>1),
+	},
+	#endif
+};
 
 #ifdef CONFIG_IMX072
 static struct msm_camera_sensor_platform_info imx072_sensor_7627a_info = {
@@ -1830,6 +1839,7 @@ static struct platform_device msm_camera_sensor_mt9e013 = {
 };
 #endif
 
+#if 0
 static struct i2c_board_info i2c_camera_3M_devices[] = {
 /* HTC_START */
 	#ifdef CONFIG_MT9T013
@@ -1852,6 +1862,7 @@ static struct i2c_board_info i2c_camera_5M_devices[] = {
 */
 	#endif
 };
+#endif
 #endif /* CONFIG_MSM_CAMERA define END */
 #if defined(CONFIG_SERIAL_MSM_HSL_CONSOLE) \
 		&& defined(CONFIG_MSM_SHARED_GPIO_FOR_UART2DM)
@@ -1974,11 +1985,9 @@ static struct platform_device *golfu_devices[] __initdata = {
 	&htc_headset_mgr,
 	&htc_drm,
 /*	&smsc911x_device,*/
-/* //move blow for XA/XB board
 #ifdef CONFIG_S5K4E1
 	&msm_camera_sensor_s5k4e1,
 #endif
-*/
 #ifdef CONFIG_IMX072
 /*	&msm_camera_sensor_imx072,*/
 #endif
@@ -2009,7 +2018,7 @@ static struct platform_device *golfu_devices[] __initdata = {
 };
 #endif
 
-/* for XA board with 3M and XB board with 5M Camera */
+/* for XA board with 3M and XB board with 5M Camera 
 #if defined(CONFIG_MSM_CAMERA)
 static struct platform_device *golfu_camera_5M_devices[] __initdata = {
 	&msm_camera_sensor_s5k4e1,
@@ -2018,7 +2027,7 @@ static struct platform_device *golfu_camera_5M_devices[] __initdata = {
 static struct platform_device *golfu_camera_3M_devices[] __initdata = {
 	&msm_camera_sensor_mt9t013,
 };
-#endif
+#endif*/
 
 static unsigned pmem_kernel_ebi1_size = PMEM_KERNEL_EBI1_SIZE;
 static int __init pmem_kernel_ebi1_size_setup(char *p)
@@ -2996,11 +3005,13 @@ static void __init golfu_init(void)
 	platform_add_devices(golfu_devices,
 			ARRAY_SIZE(golfu_devices));
 
+#if 0
 #if defined(CONFIG_MSM_CAMERA) /* for 3M/5M sensor probed */
 		if(system_rev >= 0x1) /* for XB board */
 		  platform_add_devices(golfu_camera_5M_devices,ARRAY_SIZE(golfu_camera_5M_devices));
 		else /* for XA board */
 		  platform_add_devices(golfu_camera_3M_devices,ARRAY_SIZE(golfu_camera_3M_devices));
+#endif
 #endif
 
 	/*Just init usb_id pin for accessory, accessory may not be used in golfu */
@@ -3067,17 +3078,23 @@ static void __init golfu_init(void)
 	i2c_register_board_info(MSM_GSBI1_QUP_I2C_BUS_ID,
 			i2c_aic3254_devices, ARRAY_SIZE(i2c_aic3254_devices));
 #endif
-
+#if 0
 #if defined(CONFIG_MSM_CAMERA)
 	/* msm_camera_vreg_init(); // sync 2.6.38*/
-	if(system_rev >= 0x1) /* for XB board */
+	/*if(system_rev >= 0x1) /* for XB board */
 		i2c_register_board_info(MSM_GSBI0_QUP_I2C_BUS_ID,
 		i2c_camera_5M_devices,
 		ARRAY_SIZE(i2c_camera_5M_devices));
 	else /* for XA board */
 		i2c_register_board_info(MSM_GSBI0_QUP_I2C_BUS_ID,
 		i2c_camera_3M_devices,
-			ARRAY_SIZE(i2c_camera_3M_devices));
+			ARRAY_SIZE(i2c_camera_3M_devices));*
+#endif
+#endif
+#ifdef CONFIG_MSM_CAMERA
+	i2c_register_board_info(MSM_GSBI0_QUP_I2C_BUS_ID,
+			i2c_camera_devices,
+			ARRAY_SIZE(i2c_camera_devices));
 #endif
 #if 0
 	platform_device_register(&kp_pdev);

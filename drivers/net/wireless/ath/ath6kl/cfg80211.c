@@ -84,6 +84,8 @@ static struct ieee80211_rate ath6kl_rates[] = {
 #define ath6kl_g_rates_size    12
 
 
+int gpio_get_value(int gpio);
+
 static struct ieee80211_channel ath6kl_2ghz_channels[] = {
 	CHAN2G(1, 2412, 0),
 	CHAN2G(2, 2417, 0),

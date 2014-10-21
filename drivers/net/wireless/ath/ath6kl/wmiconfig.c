@@ -19,6 +19,7 @@
 #include "debug.h"
 #include "wmi.h"
 
+#include <net/cfg80211.h>
 #include <net/netlink.h>
 
 enum ath6kl_tm_attr {
@@ -53,6 +54,7 @@ struct sk_buff *ath6kl_wmi_get_buf(u32 size)
 }
 void ath6kl_tm_rx_wmi_event(struct ath6kl *ar, void *buf, size_t buf_len)
 {
+#ifdef CONFIG_NL80211_TESTMODE
 	struct sk_buff *skb;
 
 
@@ -72,6 +74,9 @@ void ath6kl_tm_rx_wmi_event(struct ath6kl *ar, void *buf, size_t buf_len)
 nla_put_failure:
 	kfree_skb(skb);
 	ath6kl_warn("nla_put failed on testmode rx skb!\n");
+#else
+	return;
+#endif
 }
 
 
