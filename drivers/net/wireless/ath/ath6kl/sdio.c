@@ -437,7 +437,7 @@ static void ath6kl_sdio_write_async_work(struct work_struct *work)
 
 static void ath6kl_sdio_irq_handler(struct sdio_func *func)
 {
-	//int status;
+	int status;
 	struct ath6kl_sdio *ar_sdio;
 
 	ath6kl_dbg(ATH6KL_DBG_SDIO, "irq\n");
@@ -450,12 +450,12 @@ static void ath6kl_sdio_irq_handler(struct sdio_func *func)
 	 */
 	sdio_release_host(ar_sdio->func);
 
-	//status = ath6kl_hif_intr_bh_handler(ar_sdio->ar);
+	status = ath6kl_hif_intr_bh_handler(ar_sdio->ar);
 	sdio_claim_host(ar_sdio->func);
 	atomic_set(&ar_sdio->irq_handling, 0);
 	wake_up(&ar_sdio->irq_wq);
 
-	//WARN_ON_ONCE(status && status != -ECANCELED);
+	WARN_ON_ONCE(status && status != -ECANCELED);
 }
 
 static int ath6kl_sdio_power_on(struct ath6kl *ar)
